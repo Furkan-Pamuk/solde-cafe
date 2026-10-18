@@ -45,9 +45,11 @@ const SECENEKLER = [
 
 export default function Ekran() {
   const [orders, setOrders] = useState([]);
+  const [cagrilar, setCagrilar] = useState([]);
   const [alarm, setAlarm] = useState(false);
   const [alarmMsg, setAlarmMsg] = useState("");
   const prevIds = useRef(new Set());
+  const prevCagri = useRef(new Set());
   const [sound, setSound] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
   const [bildirim, setBildirim] = useState(() => {
@@ -130,6 +132,25 @@ export default function Ekran() {
       return a.id - b.id;
     });
     setOrders(aktif);
+    try {
+      const c = await fetch("/api/cagri").then((x) => x.json());
+      const cids = new Set(c.map((x) => x.id));
+      const yeniC = c.filter((x) => !prevCagri.current.has(x.id));
+      if (yeniC.length > 0 && prevCagri.current.size > 0) {
+        setAlarmMsg("🔔 Garson isteniyor: " + yeniC.map((x) => x.name).join(", "));
+        setAlarm(true);
+        if (alarmTimer.current) clearTimeout(alarmTimer.current);
+        alarmTimer.current = setTimeout(() => setAlarm(false), 8000);
+        if (sound) { tone(getCtx(), 880); tone(getCtx(), 659, 280); }
+      }
+      prevCagri.current = cids;
+      setCagrilar(c);
+    } catch {}
+  }
+
+  async function cagriTamam(id) {
+    await fetch("/api/cagri", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    load();
   }
 
   useEffect(() => {
@@ -193,6 +214,17 @@ export default function Ekran() {
       </div>
       {alarm && <div className="caylar-alarm">{alarmMsg || "ÇAYLARRRR! Yeni sipariş geldi"}</div>}
       <div className="container" style={{ maxWidth: 1400 }}>
+        {!!cagrilar.length && (
+          <div className="card" style={{ borderLeft: "6px solid #38bdf8", marginTop: 8 }}>
+            <b>🔔 Garson isteniyor</b>
+            {cagrilar.map((c) => (
+              <div key={c.id} className="row" style={{ justifyContent: "space-between", padding: "4px 0" }}>
+                <span><b>{c.name}</b> <span className="muted">{new Date(c.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span></span>
+                <button className="btn blue" onClick={() => cagriTamam(c.id)}>Gidildi ✓</button>
+              </div>
+            ))}
+          </div>
+        )}
         {!unlocked && <div className="card" style={{ borderLeft: "6px solid #f59e0b", marginTop: 8 }}>🔇 Bildirim sesi için ekrana <b>bir kez dokun</b> (tarayıcı kilidi).</div>}
         <div className="card" style={{ marginTop: 8 }}>
           <div className="row">

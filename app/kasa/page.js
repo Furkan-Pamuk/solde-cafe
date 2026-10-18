@@ -11,6 +11,7 @@ export default function Kasa() {
   const [rapor, setRapor] = useState(null);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [borrower, setBorrower] = useState("");
+  const [damga, setDamga] = useState({});
 
   useEffect(() => {
     if (localStorage.getItem("kasa_pw")) { setPw(localStorage.getItem("kasa_pw")); setOk(true); }
@@ -27,6 +28,8 @@ export default function Kasa() {
     setAcik(a);
     const b = await fetch("/api/kasa/borc").then((r) => r.json());
     setBorc(b);
+    const dg = await fetch("/api/damga").then((r) => r.json()).catch(() => ({}));
+    setDamga(dg);
     const rp = await fetch(`/api/rapor?date=${date}`).then((r) => r.json());
     setRapor(rp);
   }
@@ -52,6 +55,18 @@ export default function Kasa() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ borrower: name }),
     });
+    load();
+  }
+
+  async function damgaKullan(name) {
+    if (!confirm(`${name} için 1 bedava kullanılsın mı? (10 damga düşer)`)) return;
+    const r = await fetch("/api/damga", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "kullan", name }),
+    });
+    const j = await r.json();
+    if (!j.ok) alert("Yetersiz damga (10 gerekli)");
     load();
   }
 
@@ -93,6 +108,10 @@ export default function Kasa() {
                   </div>
                 </div>
                 <div className="muted">{g.orders.map((o) => `#${o.id}: ${o.items.map((x) => `${x.qty} ${x.name}`).join(", ")}${o.tip > 0 ? ` (+${o.tip} bahşiş)` : ""}`).join(" | ")}</div>
+                <div className="row" style={{ marginTop: 6 }}>
+                  <span className="muted">🎟️ Damga: {damga[g.name] || 0}/10</span>
+                  {(damga[g.name] || 0) >= 10 && <button className="btn blue" onClick={() => damgaKullan(g.name)}>1 Bedava Kullan (−10)</button>}
+                </div>
               </div>
             ))}
             {!acik.length && <div className="muted">Açık hesap yok</div>}
@@ -108,6 +127,10 @@ export default function Kasa() {
                   <button className="btn" onClick={() => tahsil(b.name)}>Tahsil Et</button>
                 </div>
                 <div className="muted">{b.orders.map((o) => `#${o.id} ${new Date(o.closedAt).toLocaleDateString("tr-TR")} ${o.total}TL`).join(" | ")}</div>
+                <div className="row" style={{ marginTop: 6 }}>
+                  <span className="muted">🎟️ Damga: {damga[b.name] || 0}/10</span>
+                  {(damga[b.name] || 0) >= 10 && <button className="btn blue" onClick={() => damgaKullan(b.name)}>1 Bedava Kullan (−10)</button>}
+                </div>
               </div>
             ))}
             {!borc.length && <div className="muted">Borç yok</div>}

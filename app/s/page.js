@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import TeaLogo from "../tea-logo";
@@ -17,6 +17,10 @@ function Icerik() {
   const [sending, setSending] = useState(false);
   const [lastOrder, setLastOrder] = useState(null); // {id, day}
   const [orderStatus, setOrderStatus] = useState(null);
+  const [damga, setDamga] = useState(0);
+  const [cagriMsg, setCagriMsg] = useState("");
+  const [cagriKilit, setCagriKilit] = useState(0);
+  const bildirildi = useRef(false);
 
   function bugunKey() {
     const d = new Date();
@@ -46,13 +50,51 @@ function Icerik() {
     async function check() {
       try {
         const r = await fetch(`/api/orders/${lastOrder.id}`);
-        if (r.ok && !stop) setOrderStatus(await r.json());
+        if (r.ok && !stop) {
+          const d = await r.json();
+          setOrderStatus(d);
+          if (d.status === "hazir" && !bildirildi.current) {
+            bildirildi.current = true;
+            try {
+              if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("Çayın hazır! ☕", { body: `${d.name} — ${(d.items || []).map((i) => `${i.qty} ${i.name}`).join(", ")}` });
+              }
+            } catch {}
+          }
+        }
       } catch {}
     }
     check();
     const t = setInterval(check, 3000);
     return () => { stop = true; clearInterval(t); };
   }, [lastOrder]);
+
+  useEffect(() => {
+    if (!name) { setDamga(0); return; }
+    fetch("/api/damga").then((r) => r.json()).then((m) => setDamga(m[name] || 0)).catch(() => {});
+  }, [name]);
+
+  async function garsonCagir() {
+    if (!name || cagriKilit > 0) return;
+    setCagriMsg("");
+    const r = await fetch("/api/cagri", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location, name }),
+    });
+    if (r.ok) {
+      setCagriMsg("🔔 Garson çağrıldı, geliyor...");
+      setCagriKilit(90);
+      const t = setInterval(() => {
+        setCagriKilit((k) => {
+          if (k <= 1) { clearInterval(t); return 0; }
+          return k - 1;
+        });
+      }, 1000);
+    } else {
+      setCagriMsg("Çağrı gönderilemedi, tekrar dene.");
+    }
+  }
 
   const itemsTotal = Object.entries(cart).reduce((s, [id, q]) => {
     const p = products.find((x) => x.id === id);
@@ -84,6 +126,11 @@ function Icerik() {
     if (!res.ok) { setMsg(j.error || "Hata"); return; }
     setCart({});
     setTip(0);
+    try {
+      if ("Notification" in window && Notification.permission === "default") {
+        await Notification.requestPermission().catch(() => {});
+      }
+    } catch {}
     const saved = { id: j.id, day: j.day };
     setLastOrder(saved);
     try { localStorage.setItem("son_siparis", JSON.stringify(saved)); } catch {}
@@ -93,6 +140,7 @@ function Icerik() {
   function yeniSiparis() {
     setLastOrder(null);
     setOrderStatus(null);
+    bildirildi.current = false;
     setCart({});
     setTip(0);
     setMsg("");
@@ -154,6 +202,15 @@ function Icerik() {
               <input style={{ marginTop: 8 }} placeholder="İsim yazın" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             )}
           </div>
+          <div className="row" style={{ marginTop: 12, justifyContent: "space-between" }}>
+            <button className="btn blue" disabled={!name || cagriKilit > 0} onClick={garsonCagir}>
+              {cagriKilit > 0 ? `🔔 Çağrıldı (${cagriKilit}sn)` : "🔔 Garson Çağır"}
+            </button>
+            {damga >= 10
+              ? <b style={{ color: "#1d7a3f" }}>🎟️ 1 bedava çayın var! Kasada söyle.</b>
+              : <span className="muted">🎟️ Damgan: {damga}/10</span>}
+          </div>
+          {cagriMsg && <div style={{ marginTop: 6, fontWeight: 700 }}>{cagriMsg}</div>}
         </div>
 
         <div style={{ marginTop: 12 }}>
