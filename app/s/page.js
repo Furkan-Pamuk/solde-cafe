@@ -162,7 +162,7 @@ function Icerik() {
               <h3 style={{ margin: "8px 0" }}>{cat}</h3>
               {grouped[cat].map((p) => (
                 <div key={p.id} className="card" style={{ marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div><div className="big" style={{ fontSize: 17 }}>{p.name}</div><div className="muted">{p.price} TL</div></div>
+                  <div><div className="big" style={{ fontSize: 17, fontFamily: "Inter, sans-serif" }}>{p.name}</div><div style={{ marginTop: 4 }}><span className="price">{p.price} TL</span></div></div>
                   <div className="qty">
                     <button onClick={() => setQty(p.id, -1)}>-</button>
                     <b>{cart[p.id] || 0}</b>
